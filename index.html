@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Journaly</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(148, 163, 184, 0.1);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.2);
+            --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 1rem;
+            overflow-y: auto;
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Glassmorphism Classes */
+        .glass {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Header */
+        header {
+            padding: 1rem 0;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.25rem;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Editor Section */
+        .editor-container {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: 0 0 15px var(--accent-glow);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .editor-container:focus-within {
+            box-shadow: 0 0 25px var(--accent-glow);
+            border-color: rgba(56, 189, 248, 0.5);
+        }
+
+        .date-picker-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .date-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input[type="date"] {
+            background: transparent;
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            font-family: inherit;
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+            opacity: 0.6;
+        }
+
+        input[type="date"]:hover::-webkit-calendar-picker-indicator {
+            opacity: 1;
+        }
+
+        input[type="date"]:focus {
+            border-color: var(--accent);
+        }
+
+        textarea {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.3);
+            border: 1px solid transparent;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            line-height: 1.6;
+            padding: 1rem;
+            border-radius: 12px;
+            resize: none;
+            outline: none;
+            min-height: 120px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        textarea:focus {
+            background: rgba(15, 23, 42, 0.5);
+            border-color: rgba(56, 189, 248, 0.3);
+        }
+
+        textarea::placeholder {
+            color: rgba(148, 163, 184, 0.5);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-height: 1.5em;
+        }
+
+        .save-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .save-status.visible {
+            opacity: 1;
+        }
+
+        .save-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+        }
+
+        #entriesList {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        /* History Section */
+        .history-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-left: 0.5rem;
+        }
+
+        .entry-card {
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .entry-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .entry-card:hover {
+            transform: translateY(-2px);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        .entry-card:hover::before {
+            opacity: 1;
+        }
+
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 0.5rem;
+        }
+
+        .entry-date {
+            font-weight: 600;
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .entry-preview {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-right: 0.5rem;
+        }
+
+        .action-btn {
+            background: none;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .action-btn:hover {
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 500px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            background: #1e293b;
+            /* Solid dark background for readability */
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        textarea#importText {
+            min-height: 200px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        /* Utils */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app">
+        <header>
+            <h1>My Journal</h1>
+            <p class="subtitle">Your thoughts, stored in the link.</p>
+        </header>
+
+        <div class="glass editor-container animate-in">
+            <div class="date-picker-container">
+                <span class="date-label">Today's Entry</span>
+                <input type="date" id="dateInput">
+            </div>
+            <textarea id="journalInput" placeholder="Write your story... (3-6 lines)" autofocus></textarea>
+            <div class="status-bar">
+                <span id="charCount">0 chars</span>
+                <div class="save-status" id="saveStatus">
+                    <div class="save-indicator"></div>
+                    <span>Saved to URL</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <div class="section-header">
+                <h2 class="section-title">Past Entries</h2>
+                <div>
+                    <button id="importBtn" class="action-btn">Import</button>
+                    <button id="exportBtn" class="action-btn">Export</button>
+                </div>
+            </div>
+            <div id="entriesList">
+                <!-- Entries will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="modal">
+        <div class="glass modal-content">
+            <h3>Import Entries</h3>
+            <p class="subtitle">Format: DD.MM.YYYY: Your text...</p>
+            <textarea id="importInput" placeholder="01.01.2025:&#10;My Story..."></textarea>
+            <div class="modal-actions">
+                <button id="closeImportBtn" class="action-btn">Cancel</button>
+                <button id="confirmImportBtn" class="action-btn"
+                    style="border-color: #22c55e; color: #22c55e;">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * App Logic
+         * - Stores data in location.hash as base64 encoded JSON
+         * - Structure: Array<{ date: string, text: string, timestamp: number }>
+         */
+
+        // State
+        let entries = [];
+
+        // DOM Elements
+        const dateInput = document.getElementById('dateInput');
+        const journalInput = document.getElementById('journalInput');
+        const entriesList = document.getElementById('entriesList');
+        const saveStatus = document.getElementById('saveStatus');
+        const charCount = document.getElementById('charCount');
+        const exportBtn = document.getElementById('exportBtn');
+        const importBtn = document.getElementById('importBtn');
+        const importModal = document.getElementById('importModal');
+        const importInput = document.getElementById('importInput');
+        const closeImportBtn = document.getElementById('closeImportBtn');
+        const confirmImportBtn = document.getElementById('confirmImportBtn');
+
+        // Encode/Decode Utilities
+        const encodeState = async (data) => {
+            try {
+                const json = JSON.stringify(data);
+                // Compress using GZIP
+                const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+                const buffer = await new Response(stream).arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+
+                const binString = Array.from(bytes, (byte) =>
+                    String.fromCodePoint(byte),
+                ).join("");
+                return btoa(binString);
+            } catch (e) {
+                console.error("Encoding error", e);
+                return "";
+            }
+        };
+
+        const decodeState = async (hash) => {
+            try {
+                if (!hash || hash.length < 2) return [];
+                const cleanHash = hash.substring(1);
+                const binString = atob(cleanHash);
+                const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
+
+                try {
+                    // Try Decompressing
+                    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+                    const buffer = await new Response(stream).arrayBuffer();
+                    return JSON.parse(new TextDecoder().decode(buffer));
+                } catch (gzipError) {
+                    // Fallback to legacy uncompressed format
+                    // (The previous format was just JSON bytes base64 encoded)
+                    return JSON.parse(new TextDecoder().decode(bytes));
+                }
+            } catch (e) {
+                console.error("Decoding error", e);
+                return [];
+            }
+        };
+
+        // Core Logic
+        const loadFromUrl = async () => {
+            entries = await decodeState(window.location.hash);
+            if (!Array.isArray(entries)) entries = [];
+            renderList();
+            loadActiveEntry();
+            showSavedIndicator(window.location.hash.length);
+        };
+
+        const saveToUrl = async () => {
+            try {
+                const hash = await encodeState(entries);
+                history.replaceState(null, '', '#' + hash);
+                showSavedIndicator(hash.length);
+            } catch (e) {
+                console.error("Save failed", e);
+                alert("CRITICAL: Unable to save changes to URL! Limit reached. Please EXPORT your data immediately.");
+            }
+        };
+
+        const showSavedIndicator = (size) => {
+            saveStatus.classList.add('visible');
+            const label = saveStatus.querySelector('span');
+
+            // Warn if approaching common bookmark limits (~30k-50k)
+            if (size && size > 30000) {
+                saveStatus.style.color = '#fbbf24'; // Orange/Warning
+                label.textContent = `Saved (High Usage: ${Math.round(size / 1024)}KB)`;
+            } else {
+                saveStatus.style.color = '';
+                label.textContent = 'Saved to URL';
+            }
+        };
+
+        // Entry Management
+        const getEntryForDate = (dateStr) => {
+            return entries.find(e => e.date === dateStr);
+        };
+
+        const updateEntry = (dateStr, text) => {
+            const index = entries.findIndex(e => e.date === dateStr);
+            if (text.trim() === "") {
+                // Optional: delete empty entries? 
+                // Better to keep them if the user just cleared it temporarily, 
+                // but for URL size optimization, maybe remove if empty on save?
+                // Let's keep it simple: just update.
+                if (index !== -1) {
+                    entries[index].text = text;
+                    entries[index].timestamp = Date.now();
+                    if (text === "") {
+                        entries.splice(index, 1);
+                    }
+                }
+            } else {
+                if (index !== -1) {
+                    entries[index].text = text;
+                    entries[index].timestamp = Date.now();
+                } else {
+                    entries.push({
+                        date: dateStr,
+                        text: text,
+                        timestamp: Date.now()
+                    });
+                }
+            }
+
+            // Sort/Clean
+            entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            saveToUrl();
+            renderList();
+        };
+
+        const loadActiveEntry = () => {
+            const currentDate = dateInput.value;
+            const entry = getEntryForDate(currentDate);
+            journalInput.value = entry ? entry.text : '';
+            updateCharCount();
+        };
+
+        // Formatting
+        const formatDateFriendly = (dateStr) => {
+            const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+            return new Date(dateStr).toLocaleDateString(undefined, options);
+        };
+
+        // UI Rendering
+        const renderList = () => {
+            entriesList.innerHTML = '';
+
+            // Filter out current editing entry from list? 
+            // Usually good to see it in list too, or maybe hide "today" if it's in the editor?
+            // Let's show all other days in the list to avoid duplication if the editor is "focused" on one.
+            // But simple list is fine.
+
+            const otherEntries = entries.filter(e => e.date !== dateInput.value);
+
+            if (otherEntries.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'empty-state';
+                empty.textContent = "No past entries found.";
+                entriesList.appendChild(empty);
+                return;
+            }
+
+            otherEntries.forEach((entry, idx) => {
+                const card = document.createElement('div');
+                card.className = 'glass entry-card animate-in';
+                card.style.animationDelay = `${idx * 0.05}s`;
+
+                card.onclick = () => {
+                    dateInput.value = entry.date;
+                    loadActiveEntry();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+
+                const header = document.createElement('div');
+                header.className = 'entry-header';
+
+                const dateSpan = document.createElement('div');
+                dateSpan.className = 'entry-date';
+                dateSpan.textContent = formatDateFriendly(entry.date);
+
+                header.appendChild(dateSpan);
+
+                const preview = document.createElement('div');
+                preview.className = 'entry-preview';
+                preview.textContent = entry.text;
+
+                card.appendChild(header);
+                card.appendChild(preview);
+
+                entriesList.appendChild(card);
+            });
+        };
+
+        const updateCharCount = () => {
+            charCount.textContent = `${journalInput.value.length} chars`;
+        };
+
+        const exportData = () => {
+            if (entries.length === 0) {
+                alert("No entries to export.");
+                return;
+            }
+            let content = "My Journal Export\n\n";
+            entries.forEach(e => {
+                content += "----------------------------------------\n";
+                content += `Date: ${e.date}\n`;
+                content += "----------------------------------------\n";
+                content += `${e.text}\n\n`;
+            });
+
+            // Use Data URI method to bypass file:// protocol restrictions on Blob URLs
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+            element.setAttribute('download', `journal_export_${new Date().toISOString().split('T')[0]}.txt`);
+
+            element.style.display = 'none';
+            document.body.appendChild(element);
+
+            element.click();
+
+            document.body.removeChild(element);
+        };
+
+        const toggleModal = (show) => {
+            if (show) {
+                importModal.classList.add('open');
+            } else {
+                importModal.classList.remove('open');
+                importInput.value = '';
+            }
+        };
+
+        const parseAndImport = () => {
+            const text = importInput.value;
+            if (!text.trim()) return;
+
+            // Split by date pattern: DD.MM.YYYY:
+            // The regex captures the date group so it's included in the parts array
+            const parts = text.split(/(\d{2}\.\d{2}\.\d{4}):/);
+
+            // parts[0] is text before first date (ignore)
+            // parts[1] is first date
+            // parts[2] is first content
+            // ...
+
+            let count = 0;
+            for (let i = 1; i < parts.length; i += 2) {
+                const dateRaw = parts[i];
+                const content = parts[i + 1] ? parts[i + 1].trim() : "";
+
+                if (dateRaw && content) {
+                    const [d, m, y] = dateRaw.split('.');
+                    const isoDate = `${y}-${m}-${d}`;
+
+                    const index = entries.findIndex(e => e.date === isoDate);
+                    if (index !== -1) {
+                        entries[index].text = content;
+                        entries[index].timestamp = Date.now();
+                    } else {
+                        entries.push({ date: isoDate, text: content, timestamp: Date.now() });
+                    }
+                    count++;
+                }
+            }
+
+            if (count > 0) {
+                entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                saveToUrl();
+                renderList();
+                loadActiveEntry();
+                alert(`Successfully imported ${count} entries.`);
+                toggleModal(false);
+            } else {
+                alert("No valid entries found. Check format!");
+            }
+        };
+
+        // Initialization
+        const init = () => {
+            // Set today's date
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+
+            // Load data
+            loadFromUrl();
+
+            // Listeners
+            journalInput.addEventListener('input', (e) => {
+                updateEntry(dateInput.value, e.target.value);
+                updateCharCount();
+            });
+
+            dateInput.addEventListener('change', () => {
+                loadActiveEntry();
+                renderList(); // Re-render list to update "Past entries" (hide new current date)
+            });
+
+            exportBtn.addEventListener('click', exportData);
+
+            importBtn.addEventListener('click', () => toggleModal(true));
+            closeImportBtn.addEventListener('click', () => toggleModal(false));
+            confirmImportBtn.addEventListener('click', parseAndImport);
+
+            // Handle external hash changes (back button)
+            window.addEventListener('hashchange', () => {
+                // We need to be careful not to overwrite user input if they are typing
+                // But usually hashchange means navigation.
+                // Let's valid it:
+                const currentHash = window.location.hash.substring(1);
+                const internalHash = encodeState(entries).substring(0); // slightly expensive check
+
+                // If hash is different from what we expect from memory, assume navigation
+                // This logic is tricky with replaceState updating hash constantly.
+                // For now, loadFromUrl on hashchange is safest to support back/forward buttons properly
+                // BUT, if we type, we replaceState. The hashchange event does NOT fire for replaceState/pushState called by script in same document usually?
+                // Actually replaceState does NOT trigger hashchange.
+                // So hashchange only triggers on back/forward or manual url edit.
+                loadFromUrl();
+            });
+        };
+
+        // Auto-resize textarea
+        journalInput.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        init();
+
+    </script>
+
+</body>
+
+</html>
