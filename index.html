@@ -377,7 +377,7 @@
                 <span id="charCount">0 chars</span>
                 <div class="save-status" id="saveStatus">
                     <div class="save-indicator"></div>
-                    <span>Saved to URL</span>
+                    <span>Saved to Browser</span>
                 </div>
             </div>
         </div>
@@ -413,7 +413,7 @@
     <script>
         /**
          * App Logic
-         * - Stores data in location.hash as base64 encoded JSON
+         * - Stores data in IndexedDB
          * - Structure: Array<{ date: string, text: string, timestamp: number }>
          */
 
@@ -433,80 +433,105 @@
         const closeImportBtn = document.getElementById('closeImportBtn');
         const confirmImportBtn = document.getElementById('confirmImportBtn');
 
-        // Encode/Decode Utilities
-        const encodeState = async (data) => {
-            try {
-                const json = JSON.stringify(data);
-                // Compress using GZIP
-                const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
-                const buffer = await new Response(stream).arrayBuffer();
-                const bytes = new Uint8Array(buffer);
+        // IndexedDB Utilities
+        const DB_NAME = 'JournalDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'entries';
 
-                const binString = Array.from(bytes, (byte) =>
-                    String.fromCodePoint(byte),
-                ).join("");
-                return btoa(binString);
-            } catch (e) {
-                console.error("Encoding error", e);
-                return "";
-            }
+        let db = null;
+
+        const initDB = () => {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onerror = (event) => {
+                    console.error("IndexedDB error:", event.target.error);
+                    reject(event.target.error);
+                };
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'date' });
+                    }
+                };
+
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    resolve(db);
+                };
+            });
         };
 
-        const decodeState = async (hash) => {
-            try {
-                if (!hash || hash.length < 2) return [];
-                const cleanHash = hash.substring(1);
-                const binString = atob(cleanHash);
-                const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
+        const saveEntryToDB = (entry) => {
+            return new Promise((resolve, reject) => {
+                if (!db) return reject("DB not initialized");
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.put(entry);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        };
 
-                try {
-                    // Try Decompressing
-                    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-                    const buffer = await new Response(stream).arrayBuffer();
-                    return JSON.parse(new TextDecoder().decode(buffer));
-                } catch (gzipError) {
-                    // Fallback to legacy uncompressed format
-                    // (The previous format was just JSON bytes base64 encoded)
-                    return JSON.parse(new TextDecoder().decode(bytes));
-                }
-            } catch (e) {
-                console.error("Decoding error", e);
-                return [];
-            }
+        const deleteEntryFromDB = (date) => {
+            return new Promise((resolve, reject) => {
+                if (!db) return reject("DB not initialized");
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.delete(date);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        };
+
+        const loadEntriesFromDB = () => {
+            return new Promise((resolve, reject) => {
+                if (!db) return reject("DB not initialized");
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.getAll();
+
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
         };
 
         // Core Logic
-        const loadFromUrl = async () => {
-            entries = await decodeState(window.location.hash);
-            if (!Array.isArray(entries)) entries = [];
-            renderList();
-            loadActiveEntry();
-            showSavedIndicator(window.location.hash.length);
+        const loadFromStorage = async () => {
+            try {
+                const loaded = await loadEntriesFromDB();
+                if (Array.isArray(loaded)) {
+                    entries = loaded;
+                    // Sort desc
+                    entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                }
+                renderList();
+                loadActiveEntry();
+            } catch (e) {
+                console.error("Failed to load from DB", e);
+            }
         };
 
-        const saveToUrl = async () => {
+        const saveToStorage = async (entry, isDelete = false) => {
             try {
-                const hash = await encodeState(entries);
-                history.replaceState(null, '', '#' + hash);
-                showSavedIndicator(hash.length);
+                if (isDelete) {
+                    await deleteEntryFromDB(entry.date);
+                } else {
+                    await saveEntryToDB(entry);
+                }
+                showSavedIndicator();
             } catch (e) {
                 console.error("Save failed", e);
-                alert("CRITICAL: Unable to save changes to URL! Limit reached. Please EXPORT your data immediately.");
+                alert("CRITICAL: Database Save Failed!");
             }
         };
 
-        const showSavedIndicator = (size) => {
+        const showSavedIndicator = () => {
             saveStatus.classList.add('visible');
             const label = saveStatus.querySelector('span');
-
-            // Warn if approaching common bookmark limits (~30k-50k)
-            if (size && size > 30000) {
-                saveStatus.style.color = '#fbbf24'; // Orange/Warning
-                label.textContent = `Saved (High Usage: ${Math.round(size / 1024)}KB)`;
-            } else {
-                saveStatus.style.color = '';
-                label.textContent = 'Saved to URL';
-            }
+            saveStatus.style.color = '';
+            label.textContent = 'Saved to Browser';
         };
 
         // Entry Management
@@ -516,35 +541,28 @@
 
         const updateEntry = (dateStr, text) => {
             const index = entries.findIndex(e => e.date === dateStr);
+            const entryObj = {
+                date: dateStr,
+                text: text,
+                timestamp: Date.now()
+            };
+
             if (text.trim() === "") {
-                // Optional: delete empty entries? 
-                // Better to keep them if the user just cleared it temporarily, 
-                // but for URL size optimization, maybe remove if empty on save?
-                // Let's keep it simple: just update.
                 if (index !== -1) {
-                    entries[index].text = text;
-                    entries[index].timestamp = Date.now();
-                    if (text === "") {
-                        entries.splice(index, 1);
-                    }
+                    entries.splice(index, 1);
+                    saveToStorage(entryObj, true); // delete
                 }
             } else {
                 if (index !== -1) {
-                    entries[index].text = text;
-                    entries[index].timestamp = Date.now();
+                    entries[index] = entryObj;
                 } else {
-                    entries.push({
-                        date: dateStr,
-                        text: text,
-                        timestamp: Date.now()
-                    });
+                    entries.push(entryObj);
                 }
+                saveToStorage(entryObj, false); // save
             }
 
             // Sort/Clean
             entries.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            saveToUrl();
             renderList();
         };
 
@@ -650,42 +668,71 @@
             }
         };
 
-        const parseAndImport = () => {
+        const parseAndImport = async () => {
             const text = importInput.value;
             if (!text.trim()) return;
 
-            // Split by date pattern: DD.MM.YYYY:
-            // The regex captures the date group so it's included in the parts array
-            const parts = text.split(/(\d{2}\.\d{2}\.\d{4}):/);
-
-            // parts[0] is text before first date (ignore)
-            // parts[1] is first date
-            // parts[2] is first content
-            // ...
-
             let count = 0;
-            for (let i = 1; i < parts.length; i += 2) {
-                const dateRaw = parts[i];
-                const content = parts[i + 1] ? parts[i + 1].trim() : "";
+            let batch = [];
 
-                if (dateRaw && content) {
-                    const [d, m, y] = dateRaw.split('.');
-                    const isoDate = `${y}-${m}-${d}`;
+            // Strategy: Check if it looks like the Export format first
+            // Export format: 
+            // ----------------------------------------
+            // Date: YYYY-MM-DD
+            // ----------------------------------------
+            // Content
 
-                    const index = entries.findIndex(e => e.date === isoDate);
-                    if (index !== -1) {
-                        entries[index].text = content;
-                        entries[index].timestamp = Date.now();
-                    } else {
-                        entries.push({ date: isoDate, text: content, timestamp: Date.now() });
+            if (text.includes("My Journal Export") || text.includes("Date: ")) {
+                const entriesRaw = text.split(/----------------------------------------\nDate: (\d{4}-\d{2}-\d{2})\n----------------------------------------\n/);
+                // parts[0] = header
+                // parts[1] = date
+                // parts[2] = content
+                // ...
+
+                for (let i = 1; i < entriesRaw.length; i += 2) {
+                    const date = entriesRaw[i];
+                    const content = entriesRaw[i + 1] ? entriesRaw[i + 1].trim() : "";
+                    if (date && content) {
+                        batch.push({ date, text: content });
+                        count++;
                     }
-                    count++;
+                }
+            } else {
+                // Fallback to original DD.MM.YYYY: format
+                const parts = text.split(/(\d{2}\.\d{2}\.\d{4}):/);
+                for (let i = 1; i < parts.length; i += 2) {
+                    const dateRaw = parts[i];
+                    const content = parts[i + 1] ? parts[i + 1].trim() : "";
+
+                    if (dateRaw && content) {
+                        const [d, m, y] = dateRaw.split('.');
+                        const isoDate = `${y}-${m}-${d}`;
+                        batch.push({ date: isoDate, text: content });
+                        count++;
+                    }
                 }
             }
 
             if (count > 0) {
+                // Process batch
+                for (const item of batch) {
+                    const idx = entries.findIndex(e => e.date === item.date);
+                    const newEntry = {
+                        date: item.date,
+                        text: item.text,
+                        timestamp: Date.now()
+                    };
+
+                    if (idx !== -1) {
+                        entries[idx] = newEntry;
+                    } else {
+                        entries.push(newEntry);
+                    }
+                    // Save to DB
+                    await saveEntryToDB(newEntry);
+                }
+
                 entries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                saveToUrl();
                 renderList();
                 loadActiveEntry();
                 alert(`Successfully imported ${count} entries.`);
@@ -696,13 +743,20 @@
         };
 
         // Initialization
-        const init = () => {
+        const init = async () => {
+            // Initialize DB
+            try {
+                await initDB();
+            } catch (e) {
+                alert("Database initialization failed. App may not work.");
+            }
+
             // Set today's date
             const today = new Date().toISOString().split('T')[0];
             dateInput.value = today;
 
             // Load data
-            loadFromUrl();
+            await loadFromStorage();
 
             // Listeners
             journalInput.addEventListener('input', (e) => {
@@ -721,22 +775,7 @@
             closeImportBtn.addEventListener('click', () => toggleModal(false));
             confirmImportBtn.addEventListener('click', parseAndImport);
 
-            // Handle external hash changes (back button)
-            window.addEventListener('hashchange', () => {
-                // We need to be careful not to overwrite user input if they are typing
-                // But usually hashchange means navigation.
-                // Let's valid it:
-                const currentHash = window.location.hash.substring(1);
-                const internalHash = encodeState(entries).substring(0); // slightly expensive check
-
-                // If hash is different from what we expect from memory, assume navigation
-                // This logic is tricky with replaceState updating hash constantly.
-                // For now, loadFromUrl on hashchange is safest to support back/forward buttons properly
-                // BUT, if we type, we replaceState. The hashchange event does NOT fire for replaceState/pushState called by script in same document usually?
-                // Actually replaceState does NOT trigger hashchange.
-                // So hashchange only triggers on back/forward or manual url edit.
-                loadFromUrl();
-            });
+            // Removed Hash listener since we use IDB now
         };
 
         // Auto-resize textarea
