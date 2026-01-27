@@ -587,6 +587,18 @@
             const entry = getEntryForDate(currentDate);
             journalInput.value = entry ? entry.text : '';
             updateCharCount();
+            copyToClipboard(journalInput.value);
+        };
+
+        // Helper function to copy text to clipboard silently
+        const copyToClipboard = async (text) => {
+            if (!text || text.trim() === '') return;
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch (err) {
+                // Silently fail - clipboard copy is a convenience feature
+                console.log('Clipboard copy failed:', err);
+            }
         };
 
         // Formatting
@@ -806,10 +818,10 @@ ${currentText}`;
 
             // Try to copy to clipboard
             try {
-                await navigator.clipboard.writeText(promptTemplate);
+                await navigator.clipboard.writeText(currentText);
 
                 // Show success message with instructions
-                alert('✅ Prompt wurde in die Zwischenablage kopiert!\n\n' +
+                alert('✅ Text wurde in die Zwischenablage kopiert!\n\n' +
                     '📱 MOBILE (Android/iOS):\n' +
                     '   → Öffnen Sie die Gemini App\n' +
                     '   → Halten Sie das Eingabefeld gedrückt\n' +
@@ -858,6 +870,7 @@ ${currentText}`;
             journalInput.addEventListener('input', (e) => {
                 updateEntry(dateInput.value, e.target.value);
                 updateCharCount();
+                copyToClipboard(e.target.value);
             });
 
             dateInput.addEventListener('change', () => {
