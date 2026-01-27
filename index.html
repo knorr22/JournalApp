@@ -758,7 +758,7 @@
             }
         };
 
-        const openGeminiComic = () => {
+        const openGeminiComic = async () => {
             const currentText = journalInput.value.trim();
 
             if (!currentText) {
@@ -803,6 +803,30 @@ Labels: Below each panel, include a short German caption (Label) that summarizes
 
 BASED ON THE FOLLOWING TEXT:
 ${currentText}`;
+
+            // Try to copy to clipboard
+            try {
+                await navigator.clipboard.writeText(promptTemplate);
+
+                // Show success message with instructions
+                alert('✅ Prompt wurde in die Zwischenablage kopiert!\n\n' +
+                    '📱 MOBILE (Android/iOS):\n' +
+                    '   → Öffnen Sie die Gemini App\n' +
+                    '   → Halten Sie das Eingabefeld gedrückt\n' +
+                    '   → Wählen Sie "Einfügen"\n' +
+                    '   → Drücken Sie "Senden"\n\n' +
+                    '💻 DESKTOP:\n' +
+                    '   → Gemini wird in neuem Tab geöffnet\n' +
+                    '   → Melden Sie sich an (falls nötig)\n' +
+                    '   → Drücken Sie Strg+V (oder Cmd+V auf Mac)\n' +
+                    '   → Drücken Sie Enter');
+            } catch (err) {
+                // Fallback if clipboard API fails
+                console.error('Clipboard copy failed:', err);
+                alert('⚠️ Zwischenablage nicht verfügbar.\n\n' +
+                    'Der Prompt wird in Gemini geöffnet.\n' +
+                    'Bitte melden Sie sich an und drücken Sie "Senden".');
+            }
 
             // URL encode the prompt
             const encodedPrompt = encodeURIComponent(promptTemplate);
