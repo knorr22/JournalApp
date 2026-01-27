@@ -389,6 +389,10 @@
                     <span>Saved to Browser</span>
                 </div>
             </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+                <button id="geminiComicBtn" class="action-btn" style="border-color: #8b5cf6; color: #8b5cf6;">✨ Gemini
+                    Comic</button>
+            </div>
         </div>
 
         <div class="history-section">
@@ -754,6 +758,62 @@
             }
         };
 
+        const openGeminiComic = () => {
+            const currentText = journalInput.value.trim();
+
+            if (!currentText) {
+                alert('Bitte geben Sie zuerst einen Text ein!');
+                return;
+            }
+
+            // Prompt Template
+            const promptTemplate = `Objective: Analyze the provided user text and break it down into logical narrative sections. Create a multi-panel comic strip where each panel corresponds to one of these sections. The number of panels should be determined by the natural flow of the text, typically resulting in 3-4 panels, but allowing for more if the text contains many distinct events.
+
+1. Style & Technical Specs:
+
+Art Style: Authentic "Diary of a Wimpy Kid" (Gregs Tagebuch) aesthetic. Minimalist black and white line art, hand-drawn doodle look, and distinctive cross-hatching for shadows.
+
+Characters: Simple stick figures with oversized, expressive heads, large circular eyes, and simple tufts of hair (Jeff Kinney style).
+
+Background: Rendered on a background of textured, slightly off-white, lined notebook paper.
+
+Layout: A series of panels arranged logically (e.g., a horizontal strip for 3-4 panels, or multiple rows for more), each enclosed in a thick, hand-drawn black frame.
+
+2. Narrative Analysis (Instruction to AI):
+
+Identify Sections: Read the input text carefully. Divide it into distinct narrative scenes or "beats." The number of sections should reflect the key events in the text.
+
+Panel Mapping: Each generated panel must visually represent one of these identified sections in chronological order.
+
+3. Content, Tone & Humor:
+
+Visual Humor: Situations should be slightly exaggerated. Use "slapstick" or "awkward" visual cues (e.g., beads of sweat for stress, wide mouths for yelling, vibrating lines for shivering or laughing, motion lines).
+
+Tone: Sarcastic, self-deprecating, and melodramatic—typical for a middle-schooler's diary.
+
+4. Language & Text (CRITICAL):
+
+Language: ALL text rendered within the image must be in GERMAN.
+
+Speech/Thought Bubbles: Every panel needs a funny German comment. The text should be witty, ironic, or a dry observation of the situation, reflecting the character's internal monologue.
+
+Labels: Below each panel, include a short German caption (Label) that summarizes the scene using a hand-drawn, blocky font (e.g., "DER SCHNEEMANN-ZWISCHENFALL" or "COUCH-QUATSCH MIT MAMA").
+
+---
+
+BASED ON THE FOLLOWING TEXT:
+${currentText}`;
+
+            // URL encode the prompt
+            const encodedPrompt = encodeURIComponent(promptTemplate);
+
+            // Create Gemini URL
+            const geminiUrl = `https://gemini.google.com/app?prompt=${encodedPrompt}`;
+
+            // Open in new tab
+            window.open(geminiUrl, '_blank');
+        };
+
         // Initialization
         const init = async () => {
             // Initialize DB
@@ -786,6 +846,10 @@
             importBtn.addEventListener('click', () => toggleModal(true));
             closeImportBtn.addEventListener('click', () => toggleModal(false));
             confirmImportBtn.addEventListener('click', parseAndImport);
+
+            // Gemini Comic Button
+            const geminiComicBtn = document.getElementById('geminiComicBtn');
+            geminiComicBtn.addEventListener('click', openGeminiComic);
 
             // Removed Hash listener since we use IDB now
         };
